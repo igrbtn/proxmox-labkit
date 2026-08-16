@@ -50,12 +50,21 @@ start_lab_vm() {
 }
 
 lab_guest_status() {
-    # lab_guest_status <vmid> <node> -> "<vmstate> | <guest status>"
-    local vmid="$1" node="$2"
+    # lab_guest_status <vmid> <node> [ip] -> "<vmstate> | <guest status>"
+    # Falls back to a ping when the agent is silent: a guest that answers on the
+    # network is installing or has simply lost its virtio-serial driver, which
+    # is very different from a guest that is dead.
+    local vmid="$1" node="$2" ip="${3:-}"
     pve_node "$node" "
       st=\$(qm status $vmid 2>/dev/null | awk '{print \$2}')
       gs=\$(qm guest exec $vmid --timeout 8 -- cmd.exe /c type C:\\\\Lab\\\\status.txt 2>/dev/null | sed -n 's/.*\"out-data\" : \"\\(.*\\)\\\\r.*/\\1/p')
-      [ -z \"\$gs\" ] && gs='(agent silent - installing or booting)'
+      if [ -z \"\$gs\" ]; then
+        if [ -n '$ip' ] && ping -c1 -W1 '$ip' >/dev/null 2>&1; then
+          gs='(no agent, but answers on the network)'
+        else
+          gs='(agent silent - installing or booting)'
+        fi
+      fi
       echo \"\$st | \$gs\"
     "
 }

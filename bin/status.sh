@@ -24,7 +24,7 @@ fi
 show() {
     echo "$VMS" | while IFS=: read -r vmid name node ip rest; do
         [ -z "${vmid:-}" ] && continue
-        line=$(lab_guest_status "$vmid" "$node" 2>/dev/null)
+        line=$(lab_guest_status "$vmid" "$node" "$ip" 2>/dev/null)
         printf '%-6s %-8s %-14s %s\n' "$name" "$node" "$ip" "${line:-unreachable}"
     done
 }
