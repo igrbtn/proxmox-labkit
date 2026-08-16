@@ -1,0 +1,13 @@
+.env
+.env.*
+!.env.example
+*.pem
+*.pfx
+*.key
+id_rsa*
+.DS_Store
+*.log
+*.tmp
+*.ppm
+*.png
+scratch/
