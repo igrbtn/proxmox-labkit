@@ -32,6 +32,10 @@ echo "Pushing cluster script into VM $VMID on $NODE ..."
 pve_node "$NODE" "qm guest exec $VMID --timeout 120 -- powershell.exe -NoProfile -Command 'New-Item -ItemType Directory -Force -Path C:\\\\Lab | Out-Null; [IO.File]::WriteAllBytes(\\\"C:\\\\Lab\\\\cluster.ps1\\\", [Convert]::FromBase64String(\\\"$B64\\\"))'" >/dev/null
 
 echo "Starting cluster build ..."
-pve_node "$NODE" "qm guest exec $VMID --timeout 120 -- powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\\\Lab\\\\cluster.ps1" >/dev/null
+# -EncodedCommand instead of -File: a Windows path does not survive the
+# bash -> ssh -> qm -> powershell quoting chain, and the script then silently
+# never runs - the file is there, but no task and no log appear.
+RUN_B64=$(printf '%s' "& 'C:\\Lab\\cluster.ps1'" | iconv -f UTF-8 -t UTF-16LE | base64 | tr -d '\n')
+pve_node "$NODE" "qm guest exec $VMID --timeout 120 -- powershell.exe -NoProfile -EncodedCommand $RUN_B64" >/dev/null
 
 echo "Started. Watch: LAB=$HERE/lab.conf $KIT_ROOT/bin/status.sh -w  (expect CLUSTER|DONE-cluster)"
