@@ -45,10 +45,24 @@ cp .env.example .env && $EDITOR .env      # PVE_SSH, LAB_PW
 | `lib/` | `common.sh` (.env, ssh-обёртки, подстановка токенов), `pve.sh` (обёртки `qm`), `unattend.sh` (генерация autounattend + сборка ISO), `prepare-media.sh` |
 | `bin/` | `status.sh` (состояние VM + статус гостей), `exec.sh` (PowerShell в госте), `screenshot.sh` (консоль застрявшей VM), `cleanup.sh` |
 | `guest/` | шаблоны bootstrap: первый DC, реплика DC (AD-сайт), member-join |
-| `roles/` | ролевые state-машины поверх домена: AD CS, IIS, нода S2D, кластер S2D |
+| `roles/` | роли поверх домена: `role_adcs.ps1` (Enterprise CA), `role_iis.ps1`, `role_s2d_cluster.ps1` (сборка кластера) |
 | `labs/` | по каталогу на лабу (топология + build-скрипт); `example-ad-s2d` - рабочий пример |
 | `docs/` | `GOTCHAS.md` - грабли Windows на Proxmox. Читать при любой проблеме |
 | `.claude/` | настройки и скиллы для Claude Code |
+
+## Роли поверх домена
+
+Роль - это state-машина, которая уезжает в гостя через guest agent и работает
+сама, отчитываясь в `C:\Lab\status.txt`:
+
+```bash
+. lib/common.sh && load_env && . lib/pve.sh
+install_guest_role 201 pve-01 roles/role_adcs.ps1 role_adcs VMTAG=CA01 CA_NAME=Lab-Root-CA NETBIOS=LAB
+```
+
+Роли, которым нужны доменные права (CA, кластер), сами перерегистрируются
+задачей от `DOMAIN\Administrator`: guest agent работает от SYSTEM, а SYSTEM
+не может ни создать Enterprise CA, ни собрать кластер.
 
 ## Требования
 
