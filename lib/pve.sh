@@ -69,6 +69,28 @@ lab_guest_status() {
     "
 }
 
+install_guest_role() {
+    # install_guest_role <vmid> <node> <local role script> <task name> [key=value ...]
+    # Renders a role template, pushes it into the guest through the agent and
+    # starts it. Roles that need domain rights re-register themselves as a
+    # domain-admin task from inside (the agent runs as SYSTEM, which cannot
+    # create clusters or an Enterprise CA).
+    local vmid="$1" node="$2" script="$3" task="$4"; shift 4
+    local tmp; tmp=$(mktemp -d)
+    cp "$script" "$tmp/role.ps1"
+    local kv
+    for kv in "$@"; do
+        # ordinal sed on plain tokens; secrets go through render_secret below
+        sed -i.bak "s|__${kv%%=*}__|${kv#*=}|g" "$tmp/role.ps1" && rm -f "$tmp/role.ps1.bak"
+    done
+    render_secret "$tmp/role.ps1"
+    local b64; b64=$(base64 < "$tmp/role.ps1" | tr -d '\n')
+    rm -rf "$tmp"
+
+    pve_node "$node" "qm guest exec $vmid --timeout 120 -- powershell.exe -NoProfile -Command 'New-Item -ItemType Directory -Force -Path C:\\\\Lab | Out-Null; [IO.File]::WriteAllBytes(\\\"C:\\\\Lab\\\\$task.ps1\\\", [Convert]::FromBase64String(\\\"$b64\\\"))'" >/dev/null
+    pve_node "$node" "qm guest exec $vmid --timeout 120 -- powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\\\\Lab\\\\$task.ps1" >/dev/null
+}
+
 lab_screenshot() {
     # lab_screenshot <vmid> <node> [outfile-on-node]
     local vmid="$1" node="$2" out="${3:-/tmp/vm-$1.ppm}"
