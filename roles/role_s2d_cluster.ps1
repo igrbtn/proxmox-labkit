@@ -79,12 +79,31 @@ if ($avail -lt 3) {
     Status 'no-disks'
     return
 }
-try {
-    # virtual data disks report MediaType Unspecified -> eligibility checks must be skipped;
-    # no cache tier in a lab with a single (virtual) media type
-    Enable-ClusterStorageSpacesDirect -Confirm:$false -SkipEligibilityChecks -CacheState Disabled -PoolFriendlyName 'S2DPool' -ErrorAction Stop | Out-Null
-    Log 'S2D enabled'
-} catch { Log ('enable-s2d ERROR: ' + $_.Exception.Message); Status 's2d-error'; return }
+# Idempotent: a re-run must not fail on work that is already done. Enable-Cluster
+# StorageSpacesDirect throws when S2D is already on, and the orchestrator does
+# retry this script, so check the real state instead of trusting the exit code.
+if ((Get-ClusterS2D -ErrorAction SilentlyContinue).State -eq 'Enabled' -and
+    (Get-StoragePool -FriendlyName 'S2DPool' -ErrorAction SilentlyContinue)) {
+    Log 'S2D already enabled and pool exists - skipping'
+} else {
+    try {
+        # virtual data disks report MediaType Unspecified -> eligibility checks must be skipped;
+        # no cache tier in a lab with a single (virtual) media type
+        Enable-ClusterStorageSpacesDirect -Confirm:$false -SkipEligibilityChecks -CacheState Disabled -PoolFriendlyName 'S2DPool' -ErrorAction Stop | Out-Null
+        Log 'S2D enabled'
+    } catch {
+        Log ('enable-s2d returned: ' + $_.Exception.Message)
+        # The cmdlet reports failures it then recovers from, so believe the pool,
+        # not the exception.
+        Start-Sleep 20
+        if (-not (Get-StoragePool -FriendlyName 'S2DPool' -ErrorAction SilentlyContinue)) {
+            Log 'no pool after enable - giving up'
+            Status 's2d-error'
+            return
+        }
+        Log 'pool exists despite the error - continuing'
+    }
+}
 
 Status 'create-volume'
 try {
