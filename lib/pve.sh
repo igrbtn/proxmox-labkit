@@ -6,6 +6,7 @@ new_lab_vm() {
     # new_lab_vm <name> <vmid> <node> <ram_mb> <cores> <osdisk_gb> <storage>
     #            <bridge> <win_iso> [datadisk_count] [datadisk_gb]
     # UEFI + q35. OS disk on SATA so Windows installs without extra drivers.
+    # LAB_TPM=1 adds a TPM 2.0 (Windows 11 setup refuses to install without one).
     # NIC is e1000 on purpose - WinPE only injects boot-critical drivers, so
     # virtio-net never reaches the installed system and the guest boots with no
     # network at all.
@@ -19,6 +20,7 @@ new_lab_vm() {
         --scsihw virtio-scsi-single --net0 e1000,bridge=$bridge \
         --ostype win11 --agent enabled=1 --tablet 0 --onboot 0
       qm set $vmid --sata0 $storage:$osdisk,cache=writeback
+      [ '${LAB_TPM:-0}' = 1 ] && qm set $vmid --tpmstate0 $storage:1,version=v2.0
       qm set $vmid --ide2 local:iso/$iso,media=cdrom
       qm set $vmid --ide0 local:iso/unattend-$name.iso,media=cdrom
       qm set $vmid --boot order=ide2\;sata0

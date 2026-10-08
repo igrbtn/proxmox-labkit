@@ -114,3 +114,21 @@
   падает по правам на ещё не существующий VMID. Ждать завершения задачи.
 - ISO лежит на локальном хранилище каждой ноды - при раскладке VM по разным
   нодам образ нужно разнести заранее (`scp` внутри кластера, не качать трижды).
+
+## Старые и клиентские Windows
+
+- **WS2016: в specialize не работают командлеты ScheduledTasks.** `New-ScheduledTaskAction`
+  возвращает null, `Register-ScheduledTask` падает, задачи Lab-Bootstrap нет - гость
+  молчит, сети нет, агента нет. `arm.ps1` поэтому кладёт `SetupComplete.cmd`, который
+  повторяет регистрацию в конце установки. Диагностика молчащего гостя без консоли:
+  остановить VM, `losetup -fP --show /dev/pve/vm-N-disk-1`, `mount -t ntfs3 -o ro ...p3`,
+  читать `C:\Lab\arm.log` (UTF-16).
+- **WS2016: `-RepetitionInterval` без `-RepetitionDuration`** отвергается - остаётся
+  регистрация без повтора (запасной путь в `arm.ps1`).
+- **virtio-драйверы по версии ОС:** драйвер из папки новой Windows не грузится на старой.
+  `VIRTIO_OSV="2k16"` для WS2016, `"w11 2k25"` для Windows 11.
+- **Windows 11 без TPM не ставится:** `LAB_TPM=1` добавляет `tpmstate0` (v2.0).
+  Встроенный Administrator на клиентской Windows выключен - bootstrap всё равно идёт
+  от SYSTEM, для входа использовать доменные учётки.
+- **Exchange 2016:** на носителе нет UCMARedist, WS2016 идёт с .NET 4.6.2 - роль
+  ставит .NET 4.8 и UCMA 4.0 с download.microsoft.com (шаг `dotnet`).

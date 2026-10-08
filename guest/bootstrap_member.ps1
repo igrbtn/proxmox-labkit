@@ -87,9 +87,20 @@ if ($step -eq 'start') {
         return
     }
 
-    Status 'bootstrap|features'
-    $r = Install-WindowsFeature Failover-Clustering, FS-FileServer -IncludeManagementTools
-    Log ('features success=' + $r.Success + ' restart=' + $r.RestartNeeded)
+    # client Windows (ProductType 1) has no server features: it only joins the domain.
+    # Its power plan sleeps / hibernates an idle VM (the lab saw a Windows 11 guest power
+    # itself off after an hour) - a lab machine stays on.
+    if ((Get-CimInstance Win32_OperatingSystem).ProductType -eq 1) {
+        & powercfg.exe /change standby-timeout-ac 0
+        & powercfg.exe /change hibernate-timeout-ac 0
+        & powercfg.exe /hibernate off
+        Log 'client power plan: no sleep, no hibernate'
+    }
+    if ((Get-CimInstance Win32_OperatingSystem).ProductType -ne 1) {
+        Status 'bootstrap|features'
+        $r = Install-WindowsFeature Failover-Clustering, FS-FileServer -IncludeManagementTools
+        Log ('features success=' + $r.Success + ' restart=' + $r.RestartNeeded)
+    }
 
     Status 'bootstrap|waiting-dc'
     # DNS answering is NOT enough: the DC serves DNS long before AD itself is

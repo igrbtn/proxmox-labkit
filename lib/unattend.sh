@@ -11,6 +11,9 @@ make_unattend_iso() {
     # $4 windows image name inside install.wim
     local name="$1" bootstrap="$2" node="$3" image="$4"
     local tmp; tmp=$(mktemp -d)
+    # virtio-win driver folders by preference: a driver built for a newer Windows does not
+    # load on an older one, so WS2016 sets VIRTIO_OSV="2k16", Windows 11 "w11 2k25"
+    local osv_list="${VIRTIO_OSV:-2k25 2k22 w11 2k19}"
 
     mkdir -p "$tmp/lab"
     cp "$bootstrap" "$tmp/lab/bootstrap.ps1"
@@ -47,14 +50,14 @@ make_unattend_iso() {
         # everything else lives per component. vioserial is the critical one - the
         # guest agent runs without it but its host channel stays dead.
         for comp in vioserial NetKVM Balloon vioscsi viostor pvpanic qemupciserial; do
-          for osv in 2k25 2k22 w11 2k19; do
+          for osv in $osv_list; do
             if [ -d \"/mnt/kit-virtio/\$comp/\$osv/amd64\" ]; then
               cp -r \"/mnt/kit-virtio/\$comp/\$osv/amd64\"/* virtio/ 2>/dev/null
               break
             fi
           done
         done
-        for osv in 2k25 2k22; do
+        for osv in $osv_list; do
           [ -d /mnt/kit-virtio/amd64/\$osv ] && cp -r /mnt/kit-virtio/amd64/\$osv/* virtio/ 2>/dev/null && break
         done
         cp -r /mnt/kit-virtio/guest-agent/* guest-agent/ 2>/dev/null || true

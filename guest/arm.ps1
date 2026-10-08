@@ -7,6 +7,16 @@
 # reboot), but never at the cost of not registering the task at all.
 $ErrorActionPreference = 'Continue'
 
+# WS2016 (and older): the ScheduledTasks CIM cmdlets do not work in specialize -
+# New-ScheduledTaskAction returns null and nothing gets registered. SetupComplete.cmd
+# runs at the end of setup as SYSTEM with the Task Scheduler up, so it re-runs this
+# script; on newer Windows the second registration is a harmless -Force overwrite.
+$sc = "$env:windir\Setup\Scripts"
+if (-not (Test-Path "$sc\SetupComplete.cmd")) {
+    New-Item -ItemType Directory -Force -Path $sc | Out-Null
+    Set-Content -Path "$sc\SetupComplete.cmd" -Encoding Ascii -Value 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File C:\Lab\arm.ps1'
+}
+
 $act = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File C:\Lab\bootstrap.ps1'
 $pr  = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 $st  = New-ScheduledTaskSettingsSet -ExecutionTimeLimit (New-TimeSpan -Hours 2) -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 3) -MultipleInstances IgnoreNew
